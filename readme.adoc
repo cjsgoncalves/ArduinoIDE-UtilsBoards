@@ -1,0 +1,9 @@
+= UtilsBoards
+Carlos Gonçalves <cajocasa@gmail.com>
+v1.0
+:version-label: Version
+
+Auxiliary library to include defines independent of the board used.
+
+This library allows to include defines (WiFi or Wire constants) independent of the board used.
+
