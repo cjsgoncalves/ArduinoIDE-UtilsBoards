@@ -17,7 +17,10 @@
  * where $HOMEPATH$ is the home directory of the user (in my case is C:\Users\cgonc )
  */
 
+// Print utilities
 #include <Utils.h>
+
+// Board compatibility
 #include <UtilsBoards.h>
 
 WiFiMultiEntry creds[] = {
@@ -26,39 +29,62 @@ WiFiMultiEntry creds[] = {
 };
 
 void setup() {
-  DebugDelay( 2000 );
-  
-  serialBegin( 115200 );
+	// The next delay is executed only  if the compliler flag -DDebugMode is set
+	DebugDelay( 2000 );
+	
+	serialBegin( 115200 );
 
-  // The next message is printed only if the compliler flag -DDebugMode is set
-  DebugMessagePrintf( "Board Testing.\n" );
+	// The next message is printed only if the compliler flag -DDebugMode is set
+	DebugMessagePrintf( "Board Testing.\n" );
 
-  showBoardType();
+	showBoardType();
 
-  initInternalLed();
+	initInternalLed();
 
-  // The next message is allways printed
-  myPrintf( "Starting WiFi...\n" );
+	// The next message is allways printed
+	myPrintf( "Starting WiFi...\n" );
 
-  // The debug messages inside the function "initWiFi" are printed only if the compliler flag -DDebugMode is set
-    // Init WiFi with credential
-    //initWiFi( creds[0].ssid, creds[0].password, true /*Blik internal led*/ );
+	// The debug messages inside the function "initWiFi" are only printed if the compliler flag -DDebugMode is set
+		// Init WiFi with with minimal settings
+		initWiFi( creds[0].ssid, creds[0].password );
+		
+		// Init WiFi with a reset if connection fails 
+		if ( initWiFi( creds[0].ssid, creds[0].password, false )==false ) {
+			DebugMessagePrintf( "WiFi connection failed!\n!" );
+		}
+		
+		// Init WiFi and blink internal led during establishment of the connection 
+		initWiFi( creds[0].ssid, creds[0].password, true, true );
 
-    // Init WiFi with credential and esp hostname
-    //initWiFi( creds[1].ssid, creds[1].password, false, "myESP32" /* ESP DNS name*/ );
+		// Init WiFi and set ESP DNS hostname
+		initWiFi( creds[1].ssid, creds[1].password, true, true, "myESP32");
+		
+		// Init WiFi and specify the ESP DNS hostname
+		initWiFi( creds[1].ssid, creds[1].password, true, true, "myESP32");
+		
+		// Init WiFi, do not specify the ESP DNS hostname, and specify a Print object where the debug messages are printed
+		initWiFi( creds[1].ssid, creds[1].password, true, true, NULL, Serial);
 
-    // Init WiFi using multiple credentials
-    initWiFi( creds, 2 /*, false, NULL*/ );
+		// Init WiFi using multiple credentials
+		initWiFi( creds, 2 );
+		
+		// Init WiFi with a reset if connection fails
+		if ( initWiFi( creds, 2, false )==false ) {
+			DebugMessagePrintf( "WiFi (multi) connection failed!\n" );
+		}
+		
+		initWiFi( creds, 2, false, true );
+		
+		initWiFi( creds, 2, false, true, "ESP8266" );
+		
+		initWiFi( creds, 2, false, true, "ESP8266", Serial );
 
-    // Init WiFi using multiple credentials and esp hostname
-    //initWiFi( creds, 2, true, "myESP32" );
+	// The next message is allways printed
+	myPrintf( "WiFi is ready.\n" );
 
-  // The next message is allways printed
-  myPrintf( "WiFi is ready.\n" );
-
-  delay( 2000 );
+	delay( 2000 );
 }
 
 void loop() {
-  blinkInternalLed( 300, 700 );
+	blinkInternalLed( 300, 700 );
 }

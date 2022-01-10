@@ -16,151 +16,167 @@ const int ConnSleepTime		= (ConnSleepTimeOn+ConnSleepTimeOff);
 const int ConnectionSteps	= ( 1000 / ConnSleepTime)*ConnectionTimeOut;
 
 void showBoardType(Print& pr) {
-  myPrintf( pr, "Board family: %s\n", BOARD_FAMILY );
-  myPrintf( pr, "Board name: %s\n", BOARD_NAME );
+	myPrintf( pr, "Board family: %s\n", BOARD_FAMILY );
+	myPrintf( pr, "Board name: %s\n", BOARD_NAME );
 }
 
 void blinkInternalLed(int onTime, int offTime) {
-  internalLedOn();
-  delay( onTime );
-  internalLedOff();
-  delay( offTime );
+	internalLedOn();
+	delay( onTime );
+	internalLedOff();
+	delay( offTime );
 }
 
 void initInternalLed() {
-  pinMode( LED_BUILTIN, OUTPUT );
-  internalLedOff();
+	pinMode( LED_BUILTIN, OUTPUT );
+	internalLedOff();
 }
 
-void waitAndReset(int& counter, const bool blinkInternal, Print& pr) {
+static bool waitAndReset(int& counter, const bool blinkInternal, Print& pr, const bool resetIfNoWiFi) {
 
-  #ifdef DebugModeWiFi 
+	#ifdef DebugModeWiFi 
 	DebugMessagePrintf( pr, "(Counter=%3d, ConnectionSteps=%3d, ConnSleepTime=%5d)\n", counter, ConnectionSteps, ConnSleepTime );
-  #else
-	DebugMessagePrintf( pr, "." );  
-  #endif
-  
-  if ( blinkInternal==true ) {
-    blinkInternalLed( ConnSleepTimeOn, ConnSleepTimeOff );
-  }
-  else {
-    delay( ConnSleepTime );
-  }
-    
-  if ( ++counter>ConnectionSteps ) {
-    // After "ConnectionTimeOut" there was no connection to WiFi
-    DebugMessagePrintf( pr, "\nAfter %d seconds there was no connection to WiFi.\n", ConnectionTimeOut );
-    DebugMessagePrintf( pr, "Resetting device..." );
-    ESP.restart();
-  }
+	#else
+	DebugMessagePrintf( pr, "." );	
+	#endif
+	
+	if ( blinkInternal==true ) {
+		blinkInternalLed( ConnSleepTimeOn, ConnSleepTimeOff );
+	}
+	else {
+		delay( ConnSleepTime );
+	}
+
+	if ( ++counter>ConnectionSteps ) {
+		// After "ConnectionTimeOut" there was no connection to WiFi
+		DebugMessagePrintf( pr, "\nAfter %d seconds there was no connection to WiFi.\n", ConnectionTimeOut );
+
+		if ( resetIfNoWiFi==true) {
+			DebugMessagePrintf( pr, "Resetting device..." );
+			ESP.restart();
+		}
+		else {
+			return false;
+		}
+	}
+
+	return true;
 }
 
-void initWiFi(const char* ssid, const char* password, const bool blinkInternal, const char* hostName, Print& pr) {
-  #ifdef DebugMode
-    unsigned long timeOnInitWiFiBegin = millis();
-  #endif
-  
-  DebugMessagePrintf(     
-    pr,
-    "Initializing WiFi(%s, ******, %s, board host name=%s, Print&)\n\n",
-    ssid,
-    blinkInternal==true ? "blinkOn" : "blinkOff", 
-    hostName!=NULL ? hostName : "Not set" );
+bool initWiFi(const char* ssid, const char* password, const bool resetIfNoWiFi, const bool blinkInternal, const char* hostName, Print& pr) {
+	#ifdef DebugMode
+		unsigned long timeOnInitWiFiBegin = millis();
+	#endif
 
-  WiFi.disconnect();
-  WiFi.mode( WIFI_STA );
+	DebugMessagePrintf(		 
+		pr,
+		"Initializing WiFi(%s, ******, %s, board host name=%s, Print&)\n\n",
+		ssid,
+		blinkInternal==true ? "blinkOn" : "blinkOff", 
+		hostName!=NULL ? hostName : "Not set" );
 
-  if ( hostName!=NULL ) {
-    DebugMessagePrintf( "Setting hostName to \"%s\".\n", hostName );
+	WiFi.disconnect();
+	WiFi.mode( WIFI_STA );
 
-    #ifdef ESP8266
-      WiFi.hostname( hostName );
-    #endif
+	if ( hostName!=NULL ) {
+		DebugMessagePrintf( "Setting hostName to \"%s\".\n", hostName );
 
-    #ifdef ESP32
-      WiFi.config( INADDR_NONE, INADDR_NONE, INADDR_NONE, INADDR_NONE );
-      WiFi.setHostname( hostName );
-    #endif
-  }
+		#ifdef ESP8266
+			WiFi.hostname( hostName );
+		#endif
 
-  WiFi.begin( ssid, password );
+		#ifdef ESP32
+			WiFi.config( INADDR_NONE, INADDR_NONE, INADDR_NONE, INADDR_NONE );
+			WiFi.setHostname( hostName );
+		#endif
+	}
 
-  int counter = 0;
-  // Wait for connection
-  while ( WiFi.status()!=WL_CONNECTED ) {
-    waitAndReset( counter, blinkInternal, pr);
-  }
+	WiFi.begin( ssid, password );
 
-  if ( blinkInternal==true ) {
-    internalLedOff();
-  }
-  
-  // We are connected
-  DebugMessagePrintf( pr, "\nSSID: %s\n", WiFi.SSID().c_str() );
-  DebugMessagePrintf( pr, "IP: %s\n", WiFi.localIP().toString().c_str() );
-  DebugMessagePrintf( pr, "RSSI: %d dBm\n", WiFi.RSSI() );
+	int counter = 0;
+	// Wait for connection
+	while ( WiFi.status()!=WL_CONNECTED ) {
+		if ( waitAndReset( counter, blinkInternal, pr, resetIfNoWiFi)==false ) {
+			return false;
+		}
+	}
 
-  #ifdef DebugMode
-    DebugMessagePrintf( "WiFi initialized in %ld miliseconds.\n" , ( (unsigned long) (millis() - timeOnInitWiFiBegin) ) );
-  #endif
+	if ( blinkInternal==true ) {
+		internalLedOff();
+	}
+
+	// We are connected
+	DebugMessagePrintf( pr, "\nSSID: %s\n", WiFi.SSID().c_str() );
+	DebugMessagePrintf( pr, "IP: %s\n", WiFi.localIP().toString().c_str() );
+	DebugMessagePrintf( pr, "RSSI: %d dBm\n", WiFi.RSSI() );
+
+	#ifdef DebugMode
+		DebugMessagePrintf( "WiFi initialized in %ld miliseconds.\n" , ( (unsigned long) (millis() - timeOnInitWiFiBegin) ) );
+	#endif
+	
+	return true;
 }
 
-void initWiFi(PtrWiFiMultiEntry creds, int sizeOfCreds, const bool blinkInternal, const char* hostName, Print& pr) {
-  #ifdef DebugMode
-    unsigned long timeOnInitWiFiBegin = millis();
-  #endif
+bool initWiFi(PtrWiFiMultiEntry creds, int sizeOfCreds, const bool resetIfNoWiFi, const bool blinkInternal, const char* hostName, Print& pr) {
+	#ifdef DebugMode
+		unsigned long timeOnInitWiFiBegin = millis();
+	#endif
 
-  DebugMessagePrintf( 
-    pr, 
-    "Initializing WiFi(PtrWiFiMultiEntry, %d, %s, board host name=%s, Print&)\n\n", 
-    sizeOfCreds,
-    blinkInternal==true ? "blinkOn" : "blinkOff", 
-    hostName!=NULL ? hostName : "Not set" );
+	DebugMessagePrintf( 
+		pr, 
+		"Initializing WiFi(PtrWiFiMultiEntry, %d, %s, board host name=%s, Print&)\n\n", 
+		sizeOfCreds,
+		blinkInternal==true ? "blinkOn" : "blinkOff", 
+		hostName!=NULL ? hostName : "Not set" );
 
-  WiFi.disconnect();
-  WiFi.mode( WIFI_STA );
-  
-  WiFiMulti wifiMulti;
-  
-  for( int idxCreds=0; idxCreds<sizeOfCreds; ++idxCreds) {
-    DebugMessagePrintf( pr, "Adding %s SSID\n", creds[ idxCreds ].ssid );
-    wifiMulti.addAP( creds[ idxCreds ].ssid, creds[ idxCreds ].password );
-  }
-  
-  DebugMessagePrintf( "Done adding credentials.\n" );
-  
-  if ( hostName!=NULL ) {
-    DebugMessagePrintf( "Setting hostName to \"%s\".\n", hostName );
+	WiFi.disconnect();
+	WiFi.mode( WIFI_STA );
+	
+	WiFiMulti wifiMulti;
+	
+	for( int idxCreds=0; idxCreds<sizeOfCreds; ++idxCreds) {
+		DebugMessagePrintf( pr, "Adding %s SSID\n", creds[ idxCreds ].ssid );
+		wifiMulti.addAP( creds[ idxCreds ].ssid, creds[ idxCreds ].password );
+	}
+	
+	DebugMessagePrintf( "Done adding credentials.\n" );
 
-    #ifdef ESP8266
-      WiFi.hostname( hostName );
-    #endif
+	if ( hostName!=NULL ) {
+		DebugMessagePrintf( "Setting hostName to \"%s\".\n", hostName );
 
-    #ifdef ESP32
-      WiFi.config( INADDR_NONE, INADDR_NONE, INADDR_NONE, INADDR_NONE );
-      WiFi.setHostname( hostName );
-    #endif
-  }
+		#ifdef ESP8266
+			WiFi.hostname( hostName );
+		#endif
 
-  int counter = 0;
-  // Wait for connection
-  while ( wifiMulti.run()!=WL_CONNECTED ) {
-    waitAndReset( counter, blinkInternal, pr);
-  }
+		#ifdef ESP32
+			WiFi.config( INADDR_NONE, INADDR_NONE, INADDR_NONE, INADDR_NONE );
+			WiFi.setHostname( hostName );
+		#endif
+	}
 
-  if ( blinkInternal==true ) {
-    internalLedOff();
-  }
+	int counter = 0;
+	// Wait for connection
+	while ( wifiMulti.run()!=WL_CONNECTED ) {
+		if ( waitAndReset( counter, blinkInternal, pr, resetIfNoWiFi)==false ) {
+			return false;
+		}
+	}
 
-  WiFi.setAutoReconnect( true );
-  WiFi.persistent( true );
+	if ( blinkInternal==true ) {
+		internalLedOff();
+	}
 
-  // We are connected
-  DebugMessagePrintf( pr, "\nSSID: %s\n", WiFi.SSID().c_str() );
-  DebugMessagePrintf( pr, "IP: %s\n", WiFi.localIP().toString().c_str() );
-  DebugMessagePrintf( pr, "RSSI: %d dBm\n", WiFi.RSSI() );
+	WiFi.setAutoReconnect( true );
+	WiFi.persistent( true );
 
-  #ifdef DebugMode
-    DebugMessagePrintf( "WiFi initialized in %ld miliseconds.\n" , ( (unsigned long) (millis() - timeOnInitWiFiBegin) ) );
-  #endif
+	// We are connected
+	DebugMessagePrintf( pr, "\nSSID: %s\n", WiFi.SSID().c_str() );
+	DebugMessagePrintf( pr, "IP: %s\n", WiFi.localIP().toString().c_str() );
+	DebugMessagePrintf( pr, "RSSI: %d dBm\n", WiFi.RSSI() );
+
+	#ifdef DebugMode
+		DebugMessagePrintf( "WiFi initialized in %ld miliseconds.\n" , ( (unsigned long) (millis() - timeOnInitWiFiBegin) ) );
+	#endif
+
+	return true;
 }

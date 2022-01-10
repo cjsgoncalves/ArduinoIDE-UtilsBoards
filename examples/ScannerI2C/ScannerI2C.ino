@@ -23,16 +23,42 @@
 // Board compatibility
 #include <UtilsBoards.h>
 
+// I2C related
+#include <UtilsI2C.h>
+#include <Wire.h>
+
+// Interval time between two scans - Value in milliseconds
+const unsigned long scanTime = 5000;
+
+// Time where last I2C scan was done
+unsigned long lastScanTime;
+
 void setup() {
+	// Wait 2 seconds...
 	DebugDelay( 2000 );
 
-	DebugSerialBegin( 115200 );
+	// Initialize default serial port and wait until is is ready
+	serialBegin( 115200 );
+
+	myPrintf( "I2C Scanner.\n" );
 
 	showBoardType();
+		
+	Wire.begin( SDA, SCL );
+	myPrintf( "Wire is ready.\n" );
 
-	void initInternalLed();
+	myPrintf( "I2C scanner is ready.\n" );
+
+	lastScanTime = millis();
 }
 
 void loop() {
-	blinkInternalLed( 300, 700 );
+	if ( (millis()-lastScanTime)>scanTime ) {
+		lastScanTime = millis();
+		
+		scanBus( Wire );
+
+		// Or
+		scanBus( Wire, Serial );
+	}
 }
